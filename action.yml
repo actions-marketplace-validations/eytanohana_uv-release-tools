@@ -67,4 +67,4 @@ runs:
         PYPROJECT_PATH: ${{ inputs.pyproject_path }}
         RELEASE_LABEL_PREFIX: ${{ inputs.release_label_prefix }}
       run: |
-        python scripts/validate_version.py
+        python "${{ github.action_path }}/scripts/validate_version.py"
