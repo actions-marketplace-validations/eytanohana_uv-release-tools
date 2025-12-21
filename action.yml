@@ -30,13 +30,13 @@ outputs:
   # Validate-mode outputs
   valid:
     description: "true|false - whether validate mode passed"
-    value: ${{ steps.out.outputs.valid }}
+    value: ${{ steps.validate.outputs.valid }}
   expected_bump:
     description: "patch|minor|major - derived from PR label"
-    value: ${{ steps.out.outputs.expected_bump }}
+    value: ${{ steps.validate.outputs.expected_bump }}
   actual_bump:
     description: "patch|minor|major - derived from version delta"
-    value: ${{ steps.out.outputs.actual_bump }}
+    value: ${{ steps.validate.outputs.actual_bump }}
 
   # Tag-mode outputs
   tag:
