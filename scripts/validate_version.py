@@ -24,6 +24,7 @@ import os
 import re
 import subprocess
 import sys
+import tomllib
 from dataclasses import dataclass
 
 
@@ -109,25 +110,9 @@ def _semver_bump(base: Ver, head: Ver) -> str:
 # -----------------------------
 
 
-def _tomllib():
-    # Prefer stdlib tomllib (py3.11+); fall back to tomli if needed.
-    try:
-        import tomllib  # type: ignore[attr-defined]
-        return tomllib
-    except Exception:
-        import tomli  # type: ignore[import-not-found]
-        return tomli
-
-
 def _version_from_pyproject_content(content: str) -> Ver:
-    toml = _tomllib().loads(content.encode() if hasattr(_tomllib(), "loads") else content)
-    # Note: tomllib.loads expects str (py3.11+). tomli.loads expects str too.
-    # The above encode trick isn't necessary; keep it simple:
-    # We'll re-parse properly below.
-
     # Re-parse correctly for both tomllib/tomli
-    tl = _tomllib()
-    data = tl.loads(content)
+    data = tomllib.loads(content)
     try:
         version = data["project"]["version"]
     except KeyError as e:
@@ -143,6 +128,7 @@ def _pyproject_version_at_ref(ref: str, pyproject_path: str) -> Ver:
     Read pyproject.toml at a given git ref using `git show`.
     """
     content = _run(["git", "show", f"{ref}:{pyproject_path}"])
+    print(content)
     return _version_from_pyproject_content(content)
 
 
@@ -154,9 +140,7 @@ def _pyproject_version_at_ref(ref: str, pyproject_path: str) -> Ver:
 def _load_event() -> dict:
     event_path = _env("GITHUB_EVENT_PATH")
     with open(event_path, "r", encoding="utf-8") as f:
-        result = json.load(f)
-        print(json.dumps(result, indent=4))
-        return result
+        return json.load(f)
 
 
 def _extract_pr_labels(event: dict) -> list[str]:
@@ -212,8 +196,12 @@ def main() -> int:
         return 1
 
     try:
+        print('content before:')
         base_ver = _pyproject_version_at_ref(base_sha, pyproject_path)
+        print('\n\n\n')
+        print('content after:')
         head_ver = _pyproject_version_at_ref(head_sha, pyproject_path)
+        print('\n\n\n')
     except subprocess.CalledProcessError as e:
         print(
             "Failed to read pyproject.toml from git refs. "
