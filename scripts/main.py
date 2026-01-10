@@ -75,24 +75,16 @@ def _load_event() -> dict:
     """Load GitHub event JSON."""
     event_path = _env("GITHUB_EVENT_PATH")
     with open(event_path, "r", encoding="utf-8") as f:
-        event = json.load(f)
-        print(json.dumps(event, indent=4))
-        return event
+        return json.load(f)
 
 
-def _is_pr_merged(event: dict) -> bool:
+def _is_pr_merged(pull_request: dict) -> bool:
     """Check if PR is merged."""
-    pr = event.get("pull_request")
-    return bool(pr and pr.get("merged", False))
+    return bool(pull_request and pull_request.get("merged", False))
 
 
-def _extract_pr_labels(event: dict) -> list[str]:
+def _extract_pr_labels(pr: dict) -> list[str]:
     """Extract labels from PR."""
-    pr = event.get("pull_request")
-    if not pr:
-        raise RuntimeError(
-            "This script expects to run on a pull_request event (event.pull_request missing)."
-        )
     labels = pr.get("labels", [])
     return [lbl.get("name", "") for lbl in labels if isinstance(lbl, dict)]
 
@@ -139,14 +131,14 @@ def _extract_release_type(
 # -----------------------------
 
 
-def validate_labels(event: dict, release_label_prefix: str) -> tuple[int, str]:
+def validate_labels(pr: dict, release_label_prefix: str) -> tuple[int, str]:
     """
     Validate release labels on PR.
     Returns (exit_code, release_type).
     """
     _write_output(valid="false", release_type="")
 
-    labels = _extract_pr_labels(event)
+    labels = _extract_pr_labels(pr)
     release_type, error_msg = _extract_release_type(labels, release_label_prefix)
 
     if error_msg:
@@ -323,18 +315,19 @@ def main() -> int:
     """Main entry point - auto-detects context and runs appropriate logic."""
     release_label_prefix = _env("RELEASE_LABEL_PREFIX", "release:")
     event = _load_event()
+    pr = event.get("pull_request")
     action = event.get("action", "")
 
     # PR was closed but not merged - no-op
-    if action == "closed" and not _is_pr_merged(event):
+    if action == "closed" and not _is_pr_merged(pr):
         print("PR was closed but not merged. No action needed.")
         return 0
 
     # PR was merged - perform release
-    if _is_pr_merged(event):
+    if _is_pr_merged(pr):
         print("PR merged - performing release...")
         # Validate labels first (same validation as open/update)
-        exit_code, release_type = validate_labels(event, release_label_prefix)
+        exit_code, release_type = validate_labels(pr, release_label_prefix)
 
         if exit_code != 0:
             # Validation failed (multiple labels or invalid label)
@@ -349,7 +342,7 @@ def main() -> int:
 
     # PR is open/updated - validate labels
     print("PR open/updated - validating labels...")
-    exit_code, _ = validate_labels(event, release_label_prefix)
+    exit_code, _ = validate_labels(pr, release_label_prefix)
     return exit_code
 
 
