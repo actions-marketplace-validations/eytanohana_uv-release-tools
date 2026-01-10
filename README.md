@@ -283,7 +283,7 @@ Checklist:
 1. ✅ PR was **merged** (not just closed)
 2. ✅ PR has **exactly one** release label
 3. ✅ Workflow has `contents: write` permission
-4. ✅ Checkout step includes `token: ${{ secrets.GITHUB_TOKEN }}`
+4. ✅ Checkout step includes `token: ${{ secrets.GITHUB_TOKEN }}` (required for git push operations)
 5. ✅ `pyproject.toml` has valid version in `[project].version`
 
 ### Tag already exists
