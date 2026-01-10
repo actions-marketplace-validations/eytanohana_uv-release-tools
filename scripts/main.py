@@ -161,7 +161,7 @@ def validate_labels(event: dict, release_label_prefix: str) -> tuple[int, str]:
         return 0, ""
 
     _write_output(valid="true", release_type=release_type)
-    print(f"✓ Valid release label found: {release_label_prefix}{release_type!r} (release type: {release_type})")
+    print(f"✓ Valid release label found: {release_label_prefix}{release_type}")
     return 0, release_type
 
 
