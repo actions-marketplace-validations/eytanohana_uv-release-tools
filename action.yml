@@ -2,10 +2,6 @@ name: "uv release tools"
 description: "Validate release labels on PRs; automatically bump versions and create tags on merge"
 
 inputs:
-  mode:
-    description: "validate | release"
-    required: true
-
   pyproject_path:
     description: "Path to pyproject.toml"
     required: false
@@ -24,7 +20,7 @@ inputs:
   commit_message:
     description: "Commit message template (supports {version}, {release_type})"
     required: false
-    default: "Release {version}"
+    default: "Release {tag_prefix}{version}"
 
   default_branch:
     description: "Default branch name (fallback if auto-detection fails)"
@@ -32,30 +28,37 @@ inputs:
     default: "main"
 
 outputs:
-  # Validate-mode outputs
+  # Validation outputs (when PR is open/updated)
   valid:
     description: "true|false - whether exactly one valid release label exists"
-    value: ${{ steps.validate.outputs.valid }}
+    value: ${{ steps.action.outputs.valid }}
+
   release_type:
     description: "patch|minor|major - release type from PR label, or empty if no label"
-    value: ${{ steps.validate.outputs.release_type }}
+    value: ${{ steps.action.outputs.release_type }}
 
-  # Release-mode outputs
+
+  # Release outputs (when PR is merged)
   version:
     description: "New version after bump"
-    value: ${{ steps.release.outputs.version }}
+    value: ${{ steps.action.outputs.version }}
+
   previous_version:
     description: "Version before bump"
-    value: ${{ steps.release.outputs.previous_version }}
+    value: ${{ steps.action.outputs.previous_version }}
+
   tag:
     description: "The tag name that was created or found (e.g., v1.2.3)"
-    value: ${{ steps.release.outputs.tag }}
+    value: ${{ steps.action.outputs.tag }}
+
   created_tag:
     description: "true|false - whether a new tag was created"
-    value: ${{ steps.release.outputs.created_tag }}
+    value: ${{ steps.action.outputs.created_tag }}
+
   committed:
     description: "true|false - whether version was committed"
-    value: ${{ steps.release.outputs.committed }}
+    value: ${{ steps.action.outputs.committed }}
+
 
 runs:
   using: "composite"
@@ -66,33 +69,18 @@ runs:
         python-version: "3.12"
 
     - name: Set up uv
-      if: ${{ inputs.mode == 'release' }}
       uses: astral-sh/setup-uv@v4
       with:
         version: "latest"
 
-    # Validate mode (PR)
-    - name: Validate release labels
-      id: validate
-      if: ${{ inputs.mode == 'validate' }}
+    - name: Validate labels or create release
+      id: action
       shell: bash
       env:
-        RELEASE_LABEL_PREFIX: ${{ inputs.release_label_prefix }}
-      run: |
-        python "${{ github.action_path }}/scripts/validate_version.py"
-
-    # Release mode (post-merge)
-    - name: Bump version and create release
-      id: release
-      if: ${{ inputs.mode == 'release' }}
-      shell: bash
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-        GITHUB_REPOSITORY: ${{ github.repository }}
         PYPROJECT_PATH: ${{ inputs.pyproject_path }}
         RELEASE_LABEL_PREFIX: ${{ inputs.release_label_prefix }}
         TAG_PREFIX: ${{ inputs.tag_prefix }}
         COMMIT_MESSAGE: ${{ inputs.commit_message }}
         DEFAULT_BRANCH: ${{ inputs.default_branch }}
       run: |
-        python "${{ github.action_path }}/scripts/release.py"
+        python "${{ github.action_path }}/scripts/main.py"
