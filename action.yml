@@ -1,5 +1,9 @@
 name: "uv release tools"
 description: "Validate release labels on PRs; automatically bump versions and create tags on merge"
+author: "eytanohana"
+branding:
+  icon: "tag"
+  color: "blue"
 
 inputs:
   pyproject_path:
