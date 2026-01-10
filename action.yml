@@ -21,6 +21,16 @@ inputs:
     required: false
     default: "v"
 
+  commit_message:
+    description: "Commit message template (supports {version}, {release_type})"
+    required: false
+    default: "Release {version}"
+
+  default_branch:
+    description: "Default branch name (fallback if auto-detection fails)"
+    required: false
+    default: "main"
+
 outputs:
   # Validate-mode outputs
   valid:
@@ -30,7 +40,7 @@ outputs:
     description: "patch|minor|major - release type from PR label, or empty if no label"
     value: ${{ steps.validate.outputs.release_type }}
 
-  # Release-mode outputs (to be implemented)
+  # Release-mode outputs
   version:
     description: "New version after bump"
     value: ${{ steps.release.outputs.version }}
@@ -43,9 +53,6 @@ outputs:
   created_tag:
     description: "true|false - whether a new tag was created"
     value: ${{ steps.release.outputs.created_tag }}
-  created_release:
-    description: "true|false - whether a GitHub Release was created"
-    value: ${{ steps.release.outputs.created_release }}
   committed:
     description: "true|false - whether version was committed"
     value: ${{ steps.release.outputs.committed }}
@@ -58,6 +65,12 @@ runs:
       with:
         python-version: "3.12"
 
+    - name: Set up uv
+      if: ${{ inputs.mode == 'release' }}
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: "latest"
+
     # Validate mode (PR)
     - name: Validate release labels
       id: validate
@@ -67,3 +80,19 @@ runs:
         RELEASE_LABEL_PREFIX: ${{ inputs.release_label_prefix }}
       run: |
         python "${{ github.action_path }}/scripts/validate_version.py"
+
+    # Release mode (post-merge)
+    - name: Bump version and create release
+      id: release
+      if: ${{ inputs.mode == 'release' }}
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        PYPROJECT_PATH: ${{ inputs.pyproject_path }}
+        RELEASE_LABEL_PREFIX: ${{ inputs.release_label_prefix }}
+        TAG_PREFIX: ${{ inputs.tag_prefix }}
+        COMMIT_MESSAGE: ${{ inputs.commit_message }}
+        DEFAULT_BRANCH: ${{ inputs.default_branch }}
+      run: |
+        python "${{ github.action_path }}/scripts/release.py"
