@@ -215,11 +215,11 @@ def _create_and_push_tag(tag: str, message: str) -> bool:
         return False
 
 
-def _commit_and_push(file_path: str, message: str) -> bool:
+def _commit_and_push(message: str) -> bool:
     """Commit a file and push to origin."""
     try:
         branch = _get_current_branch()
-        _run(["git", "add", file_path], check=True)
+        _run(["git", "add", "."], check=True)
         _run(["git", "commit", "-m", message], check=True)
         _run(["git", "push", "origin", branch], check=True)
         return True
@@ -281,7 +281,7 @@ def release(release_type: str) -> int:
 
     # Commit the change
     commit_message = commit_message_template.format(tag_prefix=tag_prefix, version=new_version, release_type=release_type)
-    if not _commit_and_push(pyproject_path, commit_message):
+    if not _commit_and_push(commit_message):
         print("ERROR: Failed to commit and push version change", file=sys.stderr)
         return 1
 
