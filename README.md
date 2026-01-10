@@ -316,7 +316,7 @@ It follows the principle: **Humans decide when to release, automation handles th
 
 ## License
 
-[Add your license here]
+[MIT License](LICENSE)
 
 ## Contributing
 
