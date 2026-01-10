@@ -63,11 +63,6 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.12"
-
     - name: Set up uv
       uses: astral-sh/setup-uv@v4
       with:
@@ -83,4 +78,4 @@ runs:
         COMMIT_MESSAGE: ${{ inputs.commit_message }}
         DEFAULT_BRANCH: ${{ inputs.default_branch }}
       run: |
-        python "${{ github.action_path }}/scripts/main.py"
+        uv run --python 3.12 "${{ github.action_path }}/scripts/main.py"
