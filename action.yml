@@ -1,9 +1,9 @@
 name: "uv release tools"
-description: "Validate uv version bumps against PR labels; tag (and optionally release) from pyproject.toml"
+description: "Validate release labels on PRs; automatically bump versions and create tags on merge"
 
 inputs:
   mode:
-    description: "validate | tag"
+    description: "validate | release"
     required: true
 
   pyproject_path:
@@ -22,32 +22,33 @@ inputs:
     default: "v"
 
 outputs:
-  # Common
-  version:
-    description: "Version read from pyproject.toml (head for validate, current checkout for tag)"
-    value: ${{ steps.out.outputs.version }}
-
   # Validate-mode outputs
   valid:
-    description: "true|false - whether validate mode passed"
+    description: "true|false - whether exactly one valid release label exists"
     value: ${{ steps.validate.outputs.valid }}
-  expected_bump:
-    description: "patch|minor|major - derived from PR label"
-    value: ${{ steps.validate.outputs.expected_bump }}
-  actual_bump:
-    description: "patch|minor|major - derived from version delta"
-    value: ${{ steps.validate.outputs.actual_bump }}
+  release_type:
+    description: "patch|minor|major - release type from PR label, or empty if no label"
+    value: ${{ steps.validate.outputs.release_type }}
 
-  # Tag-mode outputs
+  # Release-mode outputs (to be implemented)
+  version:
+    description: "New version after bump"
+    value: ${{ steps.release.outputs.version }}
+  previous_version:
+    description: "Version before bump"
+    value: ${{ steps.release.outputs.previous_version }}
   tag:
     description: "The tag name that was created or found (e.g., v1.2.3)"
-    value: ${{ steps.out.outputs.tag }}
+    value: ${{ steps.release.outputs.tag }}
   created_tag:
     description: "true|false - whether a new tag was created"
-    value: ${{ steps.out.outputs.created_tag }}
+    value: ${{ steps.release.outputs.created_tag }}
   created_release:
     description: "true|false - whether a GitHub Release was created"
-    value: ${{ steps.out.outputs.created_release }}
+    value: ${{ steps.release.outputs.created_release }}
+  committed:
+    description: "true|false - whether version was committed"
+    value: ${{ steps.release.outputs.committed }}
 
 runs:
   using: "composite"
@@ -58,13 +59,11 @@ runs:
         python-version: "3.12"
 
     # Validate mode (PR)
-    - name: Validate release label vs version bump
+    - name: Validate release labels
       id: validate
       if: ${{ inputs.mode == 'validate' }}
       shell: bash
       env:
-        GITHUB_TOKEN: ${{ github.token }}
-        PYPROJECT_PATH: ${{ inputs.pyproject_path }}
         RELEASE_LABEL_PREFIX: ${{ inputs.release_label_prefix }}
       run: |
         python "${{ github.action_path }}/scripts/validate_version.py"
