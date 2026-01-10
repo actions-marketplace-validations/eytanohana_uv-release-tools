@@ -1,30 +1,44 @@
 # uv-release-tools
 
-A GitHub Action that automates semantic versioning and release tagging for Python projects using [uv](https://github.com/astral-sh/uv). Simply add a release label to your PR, and the action handles version bumping, committing, and tagging automatically.
+> **Automated semantic versioning for Python projects using uv**  
+> Add a label, merge a PR, get a release. That's it.
 
-## Features
+A GitHub Action that eliminates the manual work of version management. Simply add a `release:{type}` label to your pull request, and the action handles version bumping, committing, and tagging automatically.
 
-- 🏷️ **Label-based releases** - Add `release:patch`, `release:minor`, or `release:major` labels to trigger releases
-- ✅ **Automatic validation** - Validates labels on PR open/update to catch issues early
-- 🚀 **Zero configuration** - Auto-detects context and handles both validation and release
-- 📦 **uv integration** - Uses `uv version --bump` for reliable version management
-- 🏷️ **Git tags** - Automatically creates and pushes version tags (e.g., `v1.2.3`)
-- 🔒 **Safe defaults** - No-op if no release label, fails loudly on invalid configurations
+## Why This Exists
+
+Managing versions manually is error-prone:
+- ❌ Forgetting to bump versions
+- ❌ Version drift between `pyproject.toml` and git tags
+- ❌ Inconsistent version formats
+- ❌ Manual git operations that can fail
+
+This action solves all of that by:
+- ✅ **Single source of truth** - `pyproject.toml` is the authoritative version
+- ✅ **Zero manual steps** - Everything happens automatically on merge
+- ✅ **Early validation** - Catches label mistakes before merge
+- ✅ **Idempotent** - Safe to re-run, won't create duplicate tags
 
 ## How It Works
 
-The action automatically detects the context and behaves accordingly:
+The action is **context-aware** and automatically detects what to do:
 
-1. **PR Open/Update** → Validates release labels
-   - Ensures exactly one valid release label exists
-   - Fails if multiple labels or invalid label found
-   - No-op if no release label (allows non-release PRs)
+```
+PR Opened/Updated → Validates labels
+PR Merged         → Bumps version, commits, creates tag
+PR Closed         → No-op (nothing to do)
+```
 
-2. **PR Merged** → Performs release
-   - Validates labels again (for safety)
+### The Flow
+
+1. **You open a PR** → Action validates that you have exactly one valid release label
+2. **You merge the PR** → Action:
+   - Validates labels again (defense in depth)
    - Runs `uv version --bump <type>` to update `pyproject.toml` and `uv.lock`
-   - Commits the version change
-   - Creates and pushes a git tag
+   - Commits the changes with a customizable message
+   - Creates and pushes a git tag (e.g., `v1.2.3`)
+
+That's it. No manual version bumping. No manual tagging. No mistakes.
 
 ## Quick Start
 
@@ -65,14 +79,14 @@ Create three labels in your repository:
 ### 3. Use it
 
 1. Open a PR with your changes
-2. Add exactly one release label (`release:patch`, `release:minor`, or `release:major`)
+2. Add **exactly one** release label
 3. Merge the PR
-4. The action automatically bumps the version, commits it, and creates a tag!
+4. ✨ Version bumped, committed, and tagged automatically!
 
 ## Requirements
 
 - Python project with `pyproject.toml` using [PEP 621](https://peps.python.org/pep-0621/) format
-- Version must be defined in `[project].version` (e.g., `version = "1.2.3"`)
+- Version defined in `[project].version` (e.g., `version = "1.2.3"`)
 - Semantic versioning (X.Y.Z format)
 - `uv` installed (the action sets this up automatically)
 
@@ -81,23 +95,25 @@ Create three labels in your repository:
 | Input | Description | Default | Required |
 |-------|-------------|---------|----------|
 | `pyproject_path` | Path to `pyproject.toml` | `pyproject.toml` | No |
-| `release_label_prefix` | PR label prefix for release labels | `release:` | No |
+| `release_label_prefix` | Prefix for release labels | `release:` | No |
 | `tag_prefix` | Prefix for git tags | `v` | No |
 | `commit_message` | Commit message template | `Release {tag_prefix}{version}` | No |
 | `default_branch` | Default branch name (fallback) | `main` | No |
 
 ### Commit Message Template
 
-The `commit_message` input supports placeholders:
-- `{version}` - The new version (e.g., `1.2.3`)
-- `{tag_prefix}` - The tag prefix (e.g., `v`)
-- `{release_type}` - The release type (`patch`, `minor`, or `major`)
+The `commit_message` input supports these placeholders:
+- `{version}` - the new version (e.g., `1.2.3`)
+- `{tag_prefix}` - the tag prefix (e.g., `v`)
+- `{release_type}` - the release type (`patch`, `minor`, `major`)
 
-Example: `"chore: bump version to {version} ({release_type})"` → `"chore: bump version to 1.2.3 (minor)"`
+**Examples:**
+- `"Release {tag_prefix}{version}"` → `"Release v1.2.3"`
+- `"chore: bump to {version} ({release_type})"` → `"chore: bump to 1.2.3 (minor)"`
 
 ## Outputs
 
-### Validation Outputs (PR open/update)
+### Validation Outputs (PR opened/updated)
 
 | Output | Description |
 |--------|-------------|
@@ -110,9 +126,9 @@ Example: `"chore: bump version to {version} ({release_type})"` → `"chore: bump
 |--------|-------------|
 | `version` | New version after bump |
 | `previous_version` | Version before bump |
-| `release_type` | Release type (`patch`, `minor`, or `major`) |
+| `release_type` | Release type used |
 | `tag` | Full tag name (e.g., `v1.2.3`) |
-| `created_tag` | `true` if a new tag was created |
+| `created_tag` | `true` if tag was created |
 | `committed` | `true` if version was committed |
 
 ## Examples
@@ -120,60 +136,56 @@ Example: `"chore: bump version to {version} ({release_type})"` → `"chore: bump
 ### Basic Usage
 
 ```yaml
-name: Release
-
-on:
-  pull_request:
-    branches: [ "main" ]
-    types: [opened, synchronize, labeled, unlabeled, closed]
-
-jobs:
-  release:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: eytanohana/uv-release-tools@v1
+- uses: eytanohana/uv-release-tools@v1
 ```
 
-### Custom Configuration
+### Custom Label Prefix
 
 ```yaml
 - uses: eytanohana/uv-release-tools@v1
   with:
-    pyproject_path: "pyproject.toml"
     release_label_prefix: "version:"
-    tag_prefix: ""
-    commit_message: "chore: release {version}"
-    default_branch: "master"
 ```
 
-### Using Outputs
+This expects labels like `version:patch`, `version:minor`, `version:major`.
+
+### Custom Commit Message
 
 ```yaml
-- uses: your-username/uv-release-tools@main
+- uses: eytanohana/uv-release-tools@v1
+  with:
+    commit_message: "chore: release {version} ({release_type})"
+```
+
+### No Tag Prefix
+
+```yaml
+- uses: eytanohana/uv-release-tools@v1
+  with:
+    tag_prefix: ""
+```
+
+This creates tags like `1.2.3` instead of `v1.2.3`.
+
+### Using Outputs for Downstream Actions
+
+```yaml
+- uses: eytanohana/uv-release-tools@v1
   id: release
 
 - name: Publish to PyPI
   if: steps.release.outputs.committed == 'true'
   run: |
-    echo "Released version: ${{ steps.release.outputs.version }}"
+    echo "Released: ${{ steps.release.outputs.version }}"
     echo "Tag: ${{ steps.release.outputs.tag }}"
     # Your publish commands here
 ```
 
-### Trigger Downstream Workflows
+### Trigger PyPI Publishing on Tag
 
-Create a separate workflow that triggers on tags:
+Create `.github/workflows/publish.yml`:
 
 ```yaml
-# .github/workflows/publish.yml
 name: Publish
 
 on:
@@ -195,46 +207,49 @@ jobs:
 
 ## Behavior Details
 
-### Validation Phase (PR Open/Update)
+### Validation (PR Open/Update)
 
-- ✅ **No label** → No-op (exits 0, `valid=false`)
-- ❌ **Multiple labels** → Fails (exits 1) with clear error message
-- ❌ **Invalid label** → Fails (exits 1) if label is not `patch`, `minor`, or `major`
-- ✅ **One valid label** → Passes (exits 0, `valid=true`, `release_type` set)
+The action validates labels to catch mistakes early:
 
-### Release Phase (PR Merged)
+- ✅ **No label** → No-op (exits successfully, `valid=false`)
+  - Allows PRs without release labels
+  - No release will be created when merged
+  
+- ❌ **Multiple labels** → Fails with clear error
+  - Example: PR has both `release:patch` and `release:minor`
+  - Error message lists all release labels found
+  
+- ❌ **Invalid label** → Fails with clear error
+  - Example: `release:invalid` or `release:hotfix`
+  - Only `patch`, `minor`, `major` are valid
+  
+- ✅ **One valid label** → Passes (`valid=true`, `release_type` set)
 
-- ✅ **No label** → No-op (exits 0, no release created)
-- ❌ **Multiple labels** → Fails (exits 1) - validation runs first
-- ❌ **Invalid label** → Fails (exits 1) - validation runs first
-- ✅ **One valid label** → Performs release:
-  1. Reads current version from `pyproject.toml`
-  2. Runs `uv version --bump <type>`
-  3. Commits the version change
-  4. Creates and pushes git tag
-  5. Idempotent: skips if tag already exists
+### Release (PR Merged)
 
-### PR Closed (Not Merged)
+When a PR is merged, the action:
 
-- No-op (exits 0) - no action taken
+1. **Validates again** - Same validation as PR open (defense in depth)
+2. **Reads current version** - From `pyproject.toml`
+3. **Bumps version** - Runs `uv version --bump <type>`
+   - Updates both `pyproject.toml` and `uv.lock`
+4. **Commits changes** - Uses `git add .` to commit all changes
+5. **Creates tag** - Creates annotated tag and pushes it
+6. **Idempotent** - If tag exists, skips creation (safe to re-run)
 
-## Version Bumping Rules
+### Version Bumping
 
-The action uses `uv version --bump` which follows semantic versioning:
+Uses `uv version --bump` which follows semantic versioning:
 
-- **patch**: `1.2.3` → `1.2.4`
-- **minor**: `1.2.3` → `1.3.0`
-- **major**: `1.2.3` → `2.0.0`
+- **patch**: `1.2.3` → `1.2.4` (bug fixes)
+- **minor**: `1.2.3` → `1.3.0` (new features, backward compatible)
+- **major**: `1.2.3` → `2.0.0` (breaking changes)
 
 ## Troubleshooting
 
-### Action fails with "uv not found"
-
-The action automatically sets up `uv` using `astral-sh/setup-uv@v4`. If you see this error, ensure you're using the latest version of the action.
-
 ### "Could not find [project].version in pyproject.toml"
 
-Ensure your `pyproject.toml` follows PEP 621 format:
+Your `pyproject.toml` must use PEP 621 format:
 
 ```toml
 [project]
@@ -242,28 +257,63 @@ name = "my-package"
 version = "1.2.3"
 ```
 
-### Tag already exists
+**Not supported:**
+- `setup.py` with version
+- `__version__` in Python files
+- Other version formats
 
-The action is idempotent - if a tag already exists, it will skip tag creation and continue. This is safe and allows re-running workflows.
+### "ERROR: Found 2 release labels"
 
-### Multiple release labels error
+You have multiple release labels on your PR. Remove all but one:
+- Keep: `release:patch` OR `release:minor` OR `release:major`
+- Remove: All other release labels
 
-Remove all but one release label from your PR. The action requires exactly one release label to avoid ambiguity.
+### "ERROR: Invalid release label"
+
+The label must be exactly:
+- `release:patch`
+- `release:minor`
+- `release:major`
+
+Case-sensitive, no typos.
 
 ### Version not bumped after merge
 
-Check:
-1. PR was actually merged (not just closed)
-2. PR has exactly one release label
-3. Workflow has `contents: write` permission
-4. Checkout step includes `token: ${{ secrets.GITHUB_TOKEN }}`
+Checklist:
+1. ✅ PR was **merged** (not just closed)
+2. ✅ PR has **exactly one** release label
+3. ✅ Workflow has `contents: write` permission
+4. ✅ Checkout step includes `token: ${{ secrets.GITHUB_TOKEN }}`
+5. ✅ `pyproject.toml` has valid version in `[project].version`
+
+### Tag already exists
+
+This is **safe** - the action is idempotent. If a tag exists, it skips creation and continues. This allows you to re-run workflows without errors.
+
+### Action fails silently
+
+Check the workflow logs. The action prints clear messages:
+- `"PR merged - performing release..."` - Release in progress
+- `"No release label found..."` - No-op (expected if no label)
+- `"✓ Release complete..."` - Success
+
+## Design Philosophy
+
+This action is designed to be **boring** - and that's a feature:
+
+- **Predictable** - Same input always produces same output
+- **Safe** - Fails loudly on errors, no-op on edge cases
+- **Simple** - No configuration needed for most cases
+- **Reliable** - Idempotent operations, no race conditions
+
+It follows the principle: **Humans decide when to release, automation handles the mechanics.**
 
 ## Limitations
 
-- Only supports PEP 621 `pyproject.toml` format
-- Requires semantic versioning (X.Y.Z format)
-- Does not support pre-release versions (e.g., `1.2.3.dev1`)
-- Does not create GitHub Releases (only git tags)
+- **PEP 621 only** - Requires `[project].version` in `pyproject.toml`
+- **Semantic versioning** - Only supports X.Y.Z format
+- **No pre-releases** - Doesn't support `1.2.3.dev1`, `1.2.3-rc1`, etc.
+- **Git tags only** - Doesn't create GitHub Releases (use downstream workflows)
 
 ## License
 
@@ -271,4 +321,4 @@ Check:
 
 ## Contributing
 
-Contributions welcome! Please open an issue or PR.
+Contributions welcome! Please open an issue or pull request.
